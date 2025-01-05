@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Czółko</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    const socket = io();
+    </script>
+    <script src="client.js"></script>
+</head>
+<body>
+    <video autoplay muted></video>
+    <button onclick="CreateRoom()">Create Private Room</button>
+    <input type="text" id="gamerusername" /> 
+    <button onclick="buttonUsername()">change username</button>
+    <input type="number" id="gameravatar" />
+    <button onclick="buttonUsername()">change avatar</button>
+</body>
+</html>

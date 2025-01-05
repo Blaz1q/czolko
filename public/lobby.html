@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Czółko</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    const socket = io();
+    </script>
+    <script defer src="gameclient.js"></script>
+</head>
+<body>
+    <div id="streamsContainer">
+        <video id="localVideo" autoplay muted></video>
+    </div>
+    <div id="sidebar">
+        <div id="gameplay-container">
+            <div id="gamemode">
+                gamemode
+            </div>
+            <div id="settings">
+                settings
+            </div>
+        </div>
+        <div id="chat-container">
+            <div id="chat">
+            
+            </div>
+            <input type="text" id="userMessage" />
+            <button onclick="sendMessage()">send message</button>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+body{
+    display:flex;
+}
+#streamsContainer{
+    flex: 3;
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    width: 100%;
+    overflow: hidden;
+    align-items: start;
+    height: 100%;
+    *{
+        width:100%;
+    }
+    gap: .6em;
+    video {
+        -webkit-transform: scaleX(-1);
+        transform: scaleX(-1);
+    }
+}
+#sidebar {
+    height: 97vh;
+    display: flex;
+    flex-direction: column;
+}
+#gameplay-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#chat-container {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;  // Prevents chat-container from growing or shrinking
+    max-height: 400px; // Set a max height to constrain the chat area
+}
+
+#chat {
+    word-break: break-all;
+    overflow-y: auto; // Enable vertical scrolling
+    flex-grow: 1;  // Allow chat to grow and take available space within the container
+    max-height: 400px; // Max height of the chat, adjust as necessary
+    padding: 10px;
+}
