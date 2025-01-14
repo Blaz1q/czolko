@@ -1,28 +1,53 @@
+@import url("https://fonts.googleapis.com/css2?family=Itim&display=swap");
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
 body {
+  height: 100vh;
+  background: linear-gradient(#B20F81, #663699);
+  font-family: "Itim", serif;
+}
+
+.main {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1.5em;
   display: flex;
+  gap: 4em;
 }
 
 #streamsContainer {
   flex: 3;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  width: 100%;
-  overflow: hidden;
+  grid-template-columns: repeat(5, 0.5fr);
+  overflow: auto;
   align-items: start;
   height: 100%;
+  width: 100%;
+  text-align: center;
   gap: 0.6em;
 }
 #streamsContainer * {
   width: 100%;
 }
-#streamsContainer video {
+#streamsContainer video, #streamsContainer img {
+  border: 0.2em solid white;
+  border-radius: 0.4em;
+}
+
+video {
   transform: scaleX(-1);
+  background-image: "./imgs/camera_disabled.png";
 }
 
 #sidebar {
-  height: 97vh;
+  flex: 2;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  gap: 1em;
 }
 
 #gameplay-container {
@@ -31,11 +56,33 @@ body {
   flex-direction: column;
 }
 
+#gameplay-buttons {
+  display: flex;
+  border-radius: 1em;
+  gap: 0.2em;
+  justify-content: space-evenly;
+}
+#gameplay-buttons button {
+  flex: 1;
+  background-color: white;
+  width: 100%;
+}
+
+#gameplay-settings {
+  background-color: white;
+  border-radius: 1em;
+  height: 100%;
+}
+
 #chat-container {
+  flex: 1;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  max-height: 400px;
+  max-height: 300px;
+  padding: 0.3em;
+  background-color: white;
+  border-radius: 1em;
 }
 
 #chat {
@@ -44,4 +91,9 @@ body {
   flex-grow: 1;
   max-height: 400px;
   padding: 10px;
+}
+
+#chat-input {
+  display: flex;
+  width: 100%;
 }/*# sourceMappingURL=style.css.map */

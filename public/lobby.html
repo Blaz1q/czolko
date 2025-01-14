@@ -12,25 +12,42 @@
     <script defer src="gameclient.js"></script>
 </head>
 <body>
-    <div id="streamsContainer">
-        <video id="localVideo" autoplay muted></video>
-    </div>
-    <div id="sidebar">
-        <div id="gameplay-container">
-            <div id="gamemode">
-                gamemode
-            </div>
-            <div id="settings">
-                settings
+    <div class="main">
+        <div id="streamsContainer">
+            <div>
+                <p id="client-username"></p>
+                <video id="localVideo" autoplay muted></video>
+                <img id="nocamera" src="./imgs/camera_disabled.png" style="display: none">
+                <button onclick="toggleCamera()">toggle camera</button>
             </div>
         </div>
-        <div id="chat-container">
-            <div id="chat">
+        <div id="sidebar">
+            <div id="gameplay-container">
+                <div id="gameplay-buttons">
+                    <button onclick="showGameplaycontainer()">gamemode</button>
+                    <button onclick="showSettingscontainer()">settings</button>
+                </div>
+                <div id="gameplay-settings">
+                    <div id="gamemode">
+                        gamemode
+                    </div>
+                    <div id="settings" style="display: none;">
+                        settings
+                    </div>
+                </div>
+            </div>
             
+            <div id="chat-container">
+                <div id="chat">
+                
+                </div>
+                <div id="chat-input">
+                    <input type="text" id="userMessage" />
+                    <button onclick="sendMessage()">send message</button>
+                </div>
             </div>
-            <input type="text" id="userMessage" />
-            <button onclick="sendMessage()">send message</button>
         </div>
     </div>
+    
 </body>
 </html>

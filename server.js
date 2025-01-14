@@ -12,14 +12,17 @@ const players = {};
 const rooms = [];
 const operators = [];
 const roomsettings = {};
-const colors = [];
+const colors = ["#1401C5","#0DAE0D","#F44E06","#9900AD","#FFC300"];
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  });
+// app.get('imgs/', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'public', '/imgs/'));
+// });
+// app.get('/', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// });
   app.get('/lobby', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'lobby.html'));
-  });
+});
 
 function sanitizeString(str) {
     return str.replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, '');
@@ -32,6 +35,7 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
     players[socket.id] = { 
         id: clientUuid,
         ingame: false,
+        color: colors[Math.floor(Math.random()*colors.length)],
         username: sanitizeString(name),  // Użycie funkcji do oczyszczania nazwy
         avatar: outfit,
         room: room
@@ -74,7 +78,7 @@ function ifOperator(ID,room){
 io.on('connection', (socket) => {
     socket.on('connected', (clientUuid,name,outfit,room) => {
         addPlayer(socket, clientUuid, name, outfit,room);
-        socket.broadcast.emit('systemmessage', `${players[socket.id].username} (${socket.id}) joined.`);
+        socket.broadcast.emit('systemmessage', `${players[socket.id].username} joined.`);
         socket.emit('position', rooms[room].indexOf(socket.id));
         for(var i=rooms[room].length-1;i>=0;i--){
             if(socket.id!=rooms[room][i]) {
@@ -88,7 +92,7 @@ io.on('connection', (socket) => {
                 console.log("user_position :"+i);
             }   
         }
-        socket.emit('systemmessage', `your socket: (${socket.id})`);
+        //socket.emit('systemmessage', `your socket: (${socket.id})`);
         socket.emit('append');
     });
     socket.on('joinRoom', (roomName) => {
@@ -105,10 +109,15 @@ io.on('connection', (socket) => {
 
     socket.on('roomMessage', ({ roomName, message }) => {
         if(players[socket.id]){
-            socket.to(roomName).emit('usermessage', `${players[socket.id].username}: ${sanitizeMessage(message)}`);
+            const player = {
+                username: players[socket.id].username,
+                color: players[socket.id].color
+            }
+            socket.to(roomName).emit('usermessage', player,`${sanitizeMessage(message)}`);
             let operator = "";
             //if(ifOperator(roomName,socket.id)) operator = "(/\\/\\)";
-            socket.emit('usermessage', operator+`${players[socket.id].username}: ${sanitizeMessage(message)}`);
+
+            socket.emit('usermessage', player,`${sanitizeMessage(message)}`);
         }
     });
     socket.on('operator',(room)=>{
