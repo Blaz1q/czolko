@@ -5,6 +5,7 @@ function getQueryParam(param) {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(param);
 }
+const message = getQueryParam('message');
 const roomName = getQueryParam('room');
 navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then((stream) => {

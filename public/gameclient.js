@@ -9,19 +9,40 @@ const context = canvas.getContext('2d');
 const nocamera = document.getElementById("nocamera");
 var gameplay_container = true;
 // Capture video
+let gameSettings = {
+    gamemode: "default",
+    customWordset: "",
+}
+function copylink(){
+    navigator.clipboard.writeText(`http://localhost:3000/?room=${roomName}`);
+}
 function getQueryParam(param) {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(param);
 }
+function kickplayer(id){
+    console.log(`kickplayer ${roomName} ${id}`);
+    socket.emit('kickplayer',roomName,id);    
+}
+function banplayer(id){
+    console.log(`banplayer ${roomName} ${id}`);
+    socket.emit('banplayer',roomName,id);    
+}
+function startGame(){
+    socket.emit('startgame',roomName);
+}
+socket.on('startgame',()=>{
+    console.log("game started :)");
+    //hide menu
+    //get gamemode
+    //gamemode = normal -> losuje gracza, wymyślasz mu pytanie (shuffle), timer 30 sek na wymyślenie słowa
+    //gamemode = losowo -> gra wymyśla każdemu słowo (słowa nie mogą się powtarzać), cooldown timer 10 sek.
+    //gamemode = tematyczne -> wybierasz graczowi jedno z 3 słów (żadne ze słów nie może się powtarzać w grze), cooldown timer 10 sek.
+});
 const roomName = getQueryParam('room');
 
-// Create a button for toggling the camera
-
-
-// Set up the video element
-
-
-// Function to start the camera
+const scaleFactor = 0.5;
+const quality = 0.5; 
 function startCamera() {
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         .then((stream) => {
@@ -29,14 +50,10 @@ function startCamera() {
             videoTrack = stream.getVideoTracks()[0];
             const { width, height } = videoTrack.getSettings();
             video.srcObject = stream;
-            const scaleFactor = 0.5;
-            // Configure canvas dimensions
+            
             canvas.width = width * scaleFactor;
             canvas.height = height * scaleFactor;
-
-            // Start sending frames
             isCameraOn = true;
-            //toggleButton.textContent = 'Turn Camera Off';
             toggleCameraDisplay();
             setInterval(() => {
                 if (isCameraOn && videoTrack.readyState === 'live' && videoTrack.enabled) {
@@ -45,7 +62,7 @@ function startCamera() {
                         if (blob) {
                             socket.emit('userstream', { frame: blob, roomName });
                         }
-                    }, 'image/jpeg', 0.5);
+                    }, 'image/jpeg', quality);
                 }
             }, 1000 / fps);
         })
@@ -124,6 +141,7 @@ socket.on("connect", () => {
     socket.emit('connected', clientUuid,clientUSERNAME,clientAVATAR,roomName);
     document.getElementById("client-username").innerText=clientUSERNAME;
     joinRoom();
+    enableSettings();
 });
 // Join a room
 function joinRoom() {
@@ -217,7 +235,8 @@ socket.on('userstream', ({ frame, userId, player }) => {
             vid.src = "./imgs/camera_disabled.png";
             URL.revokeObjectURL(url);
         };
-    } else {
+    } 
+    if(!frame){
         vid.src = "./imgs/camera_disabled.png";
     }
 });
@@ -267,9 +286,17 @@ socket.on('systemhiddenmessage', (message) => {
     chat.append(formatSystemHiddenMessage(message));
     shouldScroll(isScrolledToBottom,chat);
 });
+function enableSettings(){
+    let operatorOnly = document.getElementsByClassName("operatorOnly");
+    console.log(operatorOnly);
+    for(var i=0;i<operatorOnly.length;i++){
+        operatorOnly[i].disabled = !isOperator;
+    }
+}
 var isOperator = false;
 socket.on('operator', ()=>{
     isOperator = true;
+    enableSettings();
     //if you change the value, the server will still know who is the operator ;*
 });
 function shouldScroll(isScrolledToBottom,chat){
@@ -282,6 +309,12 @@ function shouldScroll(isScrolledToBottom,chat){
         }
     });
 }
+socket.on('banned',(message)=>{
+    window.location.href = `/?message=${message}`;
+});
+socket.on('kickplayer',(message) =>{
+    window.location.href = `/?message=${message}`;
+});
 socket.on('usermessage', (player,message) => {
     let chat = document.getElementById("chat");
     let isScrolledToBottom = Math.abs(chat.scrollTop + chat.clientHeight - chat.scrollHeight) < 5;
