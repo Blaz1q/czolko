@@ -1,17 +1,56 @@
-var fps = 24;
+var fps = 12;
 var append = false;
 let videoStream = null; // To store the current stream
 let videoTrack = null; // To store the video track
 let isCameraOn = false; // Camera state
+var requestCounter = 0;
+const requestLimit = 3;
+var canSendMessage=true;
+var penaltyCounter=0;
+const penaltyDuration=30;
 const video = document.querySelector('video');
 const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d');
 const nocamera = document.getElementById("nocamera");
 var gameplay_container = true;
 // Capture video
+const messages = {
+    polski: {
+        joined: "dołączył.",
+        left: "wyszedł.",
+        banned: "został zbanowany.",
+        kicked: "został wyrzucony.",
+        isOperator: "został operatorem.",
+        youAreOperator: "jesteś operatorem.",
+        youBecameOperator: "zostałeś teraz operatorem.",
+        tooManyPlayers: "za dużo osób.",
+        gameStarted: "gra jest rozpoczęta.",
+    },
+    english: {
+        joined: "joined.",
+        left: "left.",
+        banned: "banned.",
+        kicked: "kicked.",
+        isOperator: "is operator.",
+        youAreOperator: "you are the operator.",
+        youBecameOperator: "you are the operator.",
+        tooManyPlayers: "too many players",
+        gameStarted: "game started",
+    }
+}
+function getMessages(lang){
+    switch(lang){
+        case "polski":
+            return messages.polski;
+        case "english":
+            return messages.english;
+    }
+    return messages.english;
+}
 let gameSettings = {
     gamemode: "default",
     customWordset: "",
+    maxPlayers: 8
 }
 function copylink(){
     navigator.clipboard.writeText(`http://localhost:3000/?room=${roomName}`);
@@ -41,8 +80,8 @@ socket.on('startgame',()=>{
 });
 const roomName = getQueryParam('room');
 
-const scaleFactor = 0.5;
-const quality = 0.5; 
+const scaleFactor = 0.4;
+const quality = 0.6; 
 function startCamera() {
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         .then((stream) => {
@@ -140,20 +179,10 @@ socket.on("connect", () => {
     }
     socket.emit('connected', clientUuid,clientUSERNAME,clientAVATAR,roomName);
     document.getElementById("client-username").innerText=clientUSERNAME;
-    joinRoom();
+    let locals = document.getElementById("localStream");
+    locals.id = "user-"+socket.id;
     enableSettings();
 });
-// Join a room
-function joinRoom() {
-    socket.emit('joinRoom', roomName);
-    console.log(`Joined room: ${roomName}`);
-}
-
-// Leave a room
-function leaveRoom() {
-    socket.emit('leaveRoom', roomName);
-    console.log(`Left room: ${roomName}`);
-}
 
 // Send message to a room
 document.getElementById("userMessage").addEventListener("keypress", function(event) {
@@ -163,10 +192,42 @@ document.getElementById("userMessage").addEventListener("keypress", function(eve
       sendMessage();
     }
 });
+function applyPenalty() {
+    canSendMessage = false;
+    penaltyCounter++;
+    const duration = penaltyDuration * penaltyCounter;
+    let penalty = 0;
+
+    // Store the interval ID
+    const intervalId = setInterval(() => {
+        console.log(penalty);
+        if (penalty === duration) {
+            clearInterval(intervalId);
+            canSendMessage = true; 
+        } else {
+            canSendMessage = false;
+            penalty++;
+        }
+    }, 1000);
+}
+setInterval(()=>{
+    requestCounter=0;
+},1000);
+
 function sendMessage() {
-    let message = sanitizeMessage(document.getElementById("userMessage").value);
-    if(message.length>0&&message!=' ') socket.emit('roomMessage', { message, roomName });
+    if(canSendMessage){
+        let message = sanitizeMessage(document.getElementById("userMessage").value);
+        if(message.length>0&&message!=' '){
+            socket.emit('roomMessage', { message, roomName });
+            requestCounter++;
+            if(requestCounter>requestLimit) applyPenalty();
+        }
+    }
+    else{
+        systemHiddenMessage(`spam detected. Your penalty is ${penaltyDuration*penaltyCounter} seconds.`);
+    }
     document.getElementById("userMessage").value = "";
+    
 }
 function sanitizeString(str) {
     return str.replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, '');
@@ -194,6 +255,13 @@ function createVideoElement(userId,playerinfo) {
 socket.on('append',()=>{
     append = true;
 });
+function addWord(userId,word){
+    const videoContainer = document.getElementById(`user-${userId}`);
+    const wordcontainer = document.createElement('p');
+    const wordstring = document.createTextNode(word);
+    wordcontainer.appendChild(wordstring);
+    videoContainer.appendChild(wordcontainer);
+}
 // Remove a video element when a user disconnects
 function removeVideoElement(userId) {
     const videoContainer = document.getElementById(`user-${userId}`);
@@ -217,6 +285,10 @@ socket.on('userconnect', (userId,playerinfo) => {
     let vid = addUserVideo(userId,playerinfo);
     console.log("added "+userId);
     vid.src = "./imgs/camera_disabled.png";
+});
+socket.on('word', (index,word) => {
+    addWord(index,word);
+    console.log(`${index} ${word}`);
 });
 
 socket.on('userstream', ({ frame, userId, player }) => {
@@ -266,11 +338,6 @@ function formatUserMessage(player,message) {
     chatmessage.appendChild(node);
     return chatmessage;
 }
-function changeRoomSettings(){
-    //Roomsize
-    //CustomWordset
-    //time
-}
 function sendOperatorCommand(){
     socket.emit('operator',(roomName));
 }
@@ -280,11 +347,14 @@ socket.on('systemmessage', (message) => {
     chat.append(formatSystemMessage(message));
     shouldScroll(isScrolledToBottom,chat);
 });
-socket.on('systemhiddenmessage', (message) => {
+function systemHiddenMessage(message){
     let chat = document.getElementById("chat");
     let isScrolledToBottom = Math.abs(chat.scrollTop + chat.clientHeight - chat.scrollHeight) < 5;
     chat.append(formatSystemHiddenMessage(message));
     shouldScroll(isScrolledToBottom,chat);
+}
+socket.on('systemhiddenmessage', (message) => {
+    systemHiddenMessage(message);
 });
 function enableSettings(){
     let operatorOnly = document.getElementsByClassName("operatorOnly");
@@ -292,6 +362,41 @@ function enableSettings(){
     for(var i=0;i<operatorOnly.length;i++){
         operatorOnly[i].disabled = !isOperator;
     }
+}
+function saveSettings(){
+    let operatorOnly = document.getElementsByClassName("operatorOnly");
+    for(var i=0;i<operatorOnly.length;i++){
+        console.log();
+        switch(operatorOnly[i].getAttribute('name')){
+            case 'gameplay':
+                if(operatorOnly[i].checked){
+                    gameSettings.gamemode = operatorOnly[i].value;
+                }
+            break;
+            case 'maxplayers':
+                if(operatorOnly[i].value){
+                    gameSettings.maxPlayers = parseInt(operatorOnly[i].value);
+                }
+            break;
+            case 'customwordset':
+                if(sanitizeMessage(operatorOnly[i].value)!=""){
+                    var safe_text = sanitizeMessage(operatorOnly[i].value);
+                    var arr = safe_text.split(',')
+                    .filter(entry => entry.trim() !== '')
+                    .join(',');
+                    console.log(arr);
+                    gameSettings.customWordset=arr.toString();
+                }    
+            break;
+        }
+    }
+    console.log(gameSettings);
+    socket.emit('settings',gameSettings);
+}
+function changeRoomSettings(){
+    //Roomsize
+    //CustomWordset
+    //time
 }
 var isOperator = false;
 socket.on('operator', ()=>{

@@ -7,12 +7,26 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 const path = require('path');
+const { json } = require('stream/consumers');
 
 const players = {};
 const rooms = [];
 const operators = [];
 const bannedplayers = [];
 const roomsettings = {};
+const words = {
+    polski: {
+        normalne:["zając","prezes","kucharz","autobus","dinozaur","ananas","kotek","góral","komputer",
+            "królowa","wędkarz","lekarka","budowlaniec","morderca","wilk","magik","piłkarz",
+            "papuga","kaskader","malarz","muzyk","piwo","kawa","gitarzysta","pijak","szef",
+            "tata","mama","pożar","psycholog","robot","kurtka","krowa","telefon","samochód",
+            "plac zabaw","szkoła","las","jezioro","park","plaża","ogród","miasto","stadion","wieś",
+            "Cristiano Ronaldo","Mikołaj","czarodziej","księżniczka","rycerz","pirat","detektyw","doktor","policjant","nauczyciel",
+            "pizza","jabłko","banan","chleb","ciasto","lody","czekolada","kanapka","pierogi","sernik","Albert Einstein","Abraham Lincoln",
+            "Pablo Picasso","Elon Musk","Michael Jackson"],
+        cenzura:["sztuczna cipa","sperma","fiut","duże cyce","małe cyce","cyce miseczka c"]
+    }
+}
 const colors = ["#1401C5","#0DAE0D","#F44E06","#9900AD","#FFC300"];
 app.use(express.static(path.join(__dirname, 'public')));
 // app.get('imgs/', (req, res) => {
@@ -41,20 +55,42 @@ function checkBannedPlayers(roomname,uuid){
     }
     return false;
 }
-function setGame(roomname,isStarted){
-    let room = rooms[roomname];
-    for(var i=0;i<room.length;i++){
-        players[room[i]].ingame = isStarted;
+function shuffleArray(array) {
+    for (let i = array.length - 1; i >= 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+function setGame(socket,roomname,isStarted){
+    roomsettings[roomname].isstarted = isStarted;
+    let shuffleword = words.polski.normalne.slice();
+    shuffleArray(shuffleword);
+    for(var i=0;i<rooms[roomname].length;i++){
+        let player = players[rooms[roomname][i]];
+        player.word = shuffleword[i]; 
+    }
+    for (var i = 0; i < rooms[roomname].length; i++) {
+        for (var j = 0; j < rooms[roomname].length; j++) {
+            if (i !== j) {
+                socket.broadcast.to(rooms[roomname][j]).emit('word', rooms[roomname][i], shuffleword[i]);
+                if(j==0) socket.emit('word', rooms[roomname][i], shuffleword[i]); //nie wiem czemu działa, ale działa.
+            }
+            else{
+                if(j==0) socket.emit('word', rooms[roomname][i], "???");
+                socket.broadcast.to(rooms[roomname][j]).emit('word', rooms[roomname][i], "???");
+            }
+        }
     }
 }
 function addPlayer(socket, clientUuid, name, outfit, room) {
     players[socket.id] = { 
         id: clientUuid,
-        ingame: false,
         color: colors[Math.floor(Math.random()*colors.length)],
         username: sanitizeString(name), 
         avatar: outfit,
-        room: room
+        room: room,
+        word: "",
+        lang: "polski",
     };
     if(bannedplayers[room]){
         if(checkBannedPlayers(room,players[socket.id].id)){
@@ -68,11 +104,17 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
             socket.emit('kickplayer',"too many players");
             delete players[socket.id];
             return;
-        } 
+        }
+        if(roomsettings[room].isstarted){
+            socket.emit('kickplayer',"game is started");
+            delete players[socket.id];
+            return;
+        }
     }
     if(!rooms[room]){
         rooms[room] = [];
         roomsettings[room] = {
+            isstarted: false,
             maxPlayers: 10,
             gamemode: "normal",
             time: 30,
@@ -124,7 +166,9 @@ io.on('connection', (socket) => {
     socket.on('connected', (clientUuid,name,outfit,room) => {
         addPlayer(socket, clientUuid, name, outfit,room);
         if (!players[socket.id]) return;
-        socket.broadcast.emit('systemmessage', `${players[socket.id].username} joined.`);
+        socket.join(room);
+        socket.emit('systemmessage', `You joined the room.`);
+        socket.to(room).emit('systemmessage', `${players[socket.id].username} joined.`);
         socket.emit('position', rooms[room].indexOf(socket.id));
         for(var i=rooms[room].length-1;i>=0;i--){
             if(socket.id!=rooms[room][i]) {
@@ -138,6 +182,14 @@ io.on('connection', (socket) => {
                 console.log("user_position :"+i);
             }   
         }
+        if(players[socket.id]){
+            const operator = operators[players[socket.id].room]
+        
+            if(socket.id==operator){
+                socket.emit('systemmessage', `You are the operator.`);
+                socket.emit('operator');
+            } 
+        }
         //socket.emit('systemmessage', `your socket: (${socket.id})`);
         socket.emit('append');
     });
@@ -149,21 +201,9 @@ io.on('connection', (socket) => {
     });
     socket.on('startgame', (roomname)=>{
         if(operators[roomname]==socket.id) {
+            setGame(socket,roomname,true);
             socket.emit('startgame');
             socket.to(roomname).emit('startgame');
-            setGame(roomname,true);
-        }
-    });
-    socket.on('joinRoom', (roomName) => {
-        socket.join(roomName);
-        socket.emit('systemmessage', `You joined the room.`);
-        if(players[socket.id]){
-            const operator = operators[players[socket.id].room]
-        
-            if(socket.id==operator){
-                socket.emit('systemmessage', `You are the operator.`);
-                socket.emit('operator');
-            } 
         }
     });
 
@@ -204,7 +244,7 @@ io.on('connection', (socket) => {
     socket.on('userstream', ({ frame, roomName }) => {
         const userId = socket.id;
         const player = players[userId];
-        //console.log(player);
+        //console.log(rooms[roomName]);
         socket.to(roomName).emit('userstream', { frame, userId,player});
     });
 });
