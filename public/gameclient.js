@@ -13,6 +13,7 @@ const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d');
 const nocamera = document.getElementById("nocamera");
 var gameplay_container = true;
+var player_counter=1;
 // Capture video
 const messages = {
     polski: {
@@ -68,7 +69,7 @@ function banplayer(id){
     socket.emit('banplayer',roomName,id);    
 }
 function startGame(){
-    socket.emit('startgame',roomName);
+    if(player_counter>1) socket.emit('startgame',roomName);
 }
 socket.on('startgame',()=>{
     console.log("game started :)");
@@ -77,6 +78,13 @@ socket.on('startgame',()=>{
     //gamemode = normal -> losuje gracza, wymyślasz mu pytanie (shuffle), timer 30 sek na wymyślenie słowa
     //gamemode = losowo -> gra wymyśla każdemu słowo (słowa nie mogą się powtarzać), cooldown timer 10 sek.
     //gamemode = tematyczne -> wybierasz graczowi jedno z 3 słów (żadne ze słów nie może się powtarzać w grze), cooldown timer 10 sek.
+});
+socket.on('endGame',()=>{
+    let users = document.getElementsByClassName("video-container");
+    for(var i=0;i<users.length;i++){
+        let id = users[i].id;
+        document.getElementById(`${id}-word`).remove();
+    }
 });
 const roomName = getQueryParam('room');
 
@@ -237,27 +245,28 @@ function sanitizeMessage(str) {
        return str.replace(/\s+/g, ' ').trim();
 }
 // Create video element for user stream
-function createVideoElement(userId,playerinfo) {
+function createVideoElement(playerinfo) {
     const videoContainer = document.createElement('div');
-    videoContainer.id = `user-${userId}`;
+    videoContainer.id = `user-${playerinfo.socket}`;
     videoContainer.className = 'video-container';
     const username = document.createElement('p');
     const node = document.createTextNode(playerinfo.username);
     username.appendChild(node);
     const video = document.createElement('img');
-    video.id = `video-${userId}`;
+    video.id = `video-${playerinfo.socket}`;
     videoContainer.appendChild(username);
     videoContainer.appendChild(video);
     if(append) streamsContainer.appendChild(videoContainer);
     else streamsContainer.prepend(videoContainer);
     return video;
-}
+}//userId can be in playerinfo.
 socket.on('append',()=>{
     append = true;
 });
 function addWord(userId,word){
     const videoContainer = document.getElementById(`user-${userId}`);
     const wordcontainer = document.createElement('p');
+    wordcontainer.id = `user-${userId}-word`;
     const wordstring = document.createTextNode(word);
     wordcontainer.appendChild(wordstring);
     videoContainer.appendChild(wordcontainer);
@@ -267,12 +276,14 @@ function removeVideoElement(userId) {
     const videoContainer = document.getElementById(`user-${userId}`);
     if (videoContainer) {
         videoContainer.remove();
+        player_counter--;
     }
 }
-function addUserVideo(userId,playerinfo){
-    let video = document.getElementById(`video-${userId}`);
+function addUserVideo(playerinfo){
+    let video = document.getElementById(`video-${playerinfo.socket}`);
     if (!video) {
-        video = createVideoElement(userId,playerinfo);
+        video = createVideoElement(playerinfo);
+        player_counter++;
     }
     return video;
 }
@@ -280,10 +291,10 @@ socket.on('userdisconnect', (userId) => {
     removeVideoElement(userId);
     console.log("removed "+userId);
 });
-socket.on('userconnect', (userId,playerinfo) => {
+socket.on('userconnect', (playerinfo) => {
     console.log("user connect");
-    let vid = addUserVideo(userId,playerinfo);
-    console.log("added "+userId);
+    let vid = addUserVideo(playerinfo);
+    console.log("added "+playerinfo.socket);
     vid.src = "./imgs/camera_disabled.png";
 });
 socket.on('word', (index,word) => {
@@ -291,12 +302,12 @@ socket.on('word', (index,word) => {
     console.log(`${index} ${word}`);
 });
 
-socket.on('userstream', ({ frame, userId, player }) => {
+socket.on('userstream', ({ frame, player }) => {
     // Ensure frame is wrapped in an array for Blob construction
     const blob = new Blob([frame], { type: 'image/jpeg' });
     const url = URL.createObjectURL(blob);
 
-    let vid = addUserVideo(userId, player);
+    let vid = addUserVideo(player);
     if (url) {
         vid.src = url;
 
@@ -405,9 +416,9 @@ socket.on('operator', ()=>{
     //if you change the value, the server will still know who is the operator ;*
 });
 function shouldScroll(isScrolledToBottom,chat){
-        console.log("scroll top: "+chat.scrollTop);
-        console.log("client height: "+chat.clientHeight);
-        console.log("scroll height: "+chat.scrollHeight);
+        // console.log("scroll top: "+chat.scrollTop);
+        // console.log("client height: "+chat.clientHeight);
+        // console.log("scroll height: "+chat.scrollHeight);
     requestAnimationFrame(() => {
         if (isScrolledToBottom) {
             chat.scrollTop = chat.scrollHeight;

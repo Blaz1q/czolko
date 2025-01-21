@@ -61,8 +61,7 @@ function shuffleArray(array) {
         [array[i], array[j]] = [array[j], array[i]];
     }
 }
-function setGame(socket,roomname,isStarted){
-    roomsettings[roomname].isstarted = isStarted;
+function startGame(socket,roomname){
     let shuffleword = words.polski.normalne.slice();
     shuffleArray(shuffleword);
     for(var i=0;i<rooms[roomname].length;i++){
@@ -82,9 +81,16 @@ function setGame(socket,roomname,isStarted){
         }
     }
 }
+function endGame(socket,roomname){
+
+}
+function setGame(socket,roomname,isStarted){
+    roomsettings[roomname].isstarted = isStarted;
+}
 function addPlayer(socket, clientUuid, name, outfit, room) {
     players[socket.id] = { 
         id: clientUuid,
+        socket: socket.id,
         color: colors[Math.floor(Math.random()*colors.length)],
         username: sanitizeString(name), 
         avatar: outfit,
@@ -92,6 +98,7 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
         word: "",
         lang: "polski",
     };
+    console.log(players[socket.id]);
     if(bannedplayers[room]){
         if(checkBannedPlayers(room,players[socket.id].id)){
             socket.emit('banned');
@@ -174,10 +181,11 @@ io.on('connection', (socket) => {
             if(socket.id!=rooms[room][i]) {
                 let player = players[rooms[room][i]];
                 let playerinfo = {
+                    socket: rooms[room][i],
                     username: player.username,
                     isOwner: ifOperator(rooms[room][i],room)
                 }
-                socket.emit('userconnect', rooms[room][i],playerinfo);
+                socket.emit('userconnect',playerinfo);
                 console.log("sending :"+rooms[room][i]);
                 console.log("user_position :"+i);
             }   
@@ -204,9 +212,12 @@ io.on('connection', (socket) => {
             setGame(socket,roomname,true);
             socket.emit('startgame');
             socket.to(roomname).emit('startgame');
+            startGame(socket,roomname);
         }
     });
-
+    socket.on('endGame',(roomname)=>{
+        
+    });
     socket.on('leaveRoom', (roomName) => {
         socket.leave(roomName);
     });
@@ -236,6 +247,9 @@ io.on('connection', (socket) => {
         delete players[socket.id];
         const index = rooms[player.room].indexOf(socket.id);
         rooms[player.room].splice(index,1); //delete player from room
+        if(rooms[player.room].length<2){
+            socket.broadcast.to(player.room).emit('endGame');
+        }
         updateOperator(socket,player);
         deleteRoom(player.room); //delete room
         socket.broadcast.emit('position', index);
@@ -245,7 +259,7 @@ io.on('connection', (socket) => {
         const userId = socket.id;
         const player = players[userId];
         //console.log(rooms[roomName]);
-        socket.to(roomName).emit('userstream', { frame, userId,player});
+        socket.to(roomName).emit('userstream', { frame, player});
     });
 });
 server.listen(port, () => {
