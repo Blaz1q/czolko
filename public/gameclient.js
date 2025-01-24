@@ -73,6 +73,7 @@ function startGame(){
 }
 socket.on('startgame',()=>{
     console.log("game started :)");
+    updateClassStyle("gameplay_buttons", "display", "block");
     //hide menu
     //get gamemode
     //gamemode = normal -> losuje gracza, wymyślasz mu pytanie (shuffle), timer 30 sek na wymyślenie słowa
@@ -85,6 +86,7 @@ socket.on('endGame',()=>{
         let id = users[i].id;
         document.getElementById(`${id}-word`).remove();
     }
+    updateClassStyle("gameplay_buttons", "display", "none");
 });
 const roomName = getQueryParam('room');
 
@@ -245,21 +247,60 @@ function sanitizeMessage(str) {
        return str.replace(/\s+/g, ' ').trim();
 }
 // Create video element for user stream
+function createText(text){
+    return document.createTextNode(text);
+}
+function addListener(classname,funct){
+    document.addEventListener('click', event => {
+        if (event.target.classList.contains(classname)) {
+            const buttons = Array.from(document.querySelectorAll(`.${classname}`));
+            const index = buttons.indexOf(event.target);
+            if (index !== -1) {
+                //function here
+                console.log(`Button ${index + 1} was clicked`);
+                funct(index+1);
+            }
+        }
+    });
+}
 function createVideoElement(playerinfo) {
     const videoContainer = document.createElement('div');
     videoContainer.id = `user-${playerinfo.socket}`;
     videoContainer.className = 'video-container';
     const username = document.createElement('p');
-    const node = document.createTextNode(playerinfo.username);
-    username.appendChild(node);
+    const button_tak = document.createElement('button');
+    const button_nie = document.createElement('button');
+    const button_kick = document.createElement('button');
+    const button_ban = document.createElement('button');
+    
+    username.appendChild(createText(playerinfo.username));
+    button_tak.appendChild(createText("tak"));
+    button_nie.appendChild(createText("nie"));
+    button_kick.appendChild(createText("kick"));
+    button_ban.appendChild(createText("ban"));
+    
+    button_tak.classList.add("gameplay_buttons");
+    button_nie.classList.add("gameplay_buttons");
+    button_kick.classList.add("operator_commands");
+    button_kick.classList.add("operator_kick");
+    button_ban.classList.add("operator_commands");
+    button_ban.classList.add("operator_ban");
+    
+    username.classList.add("username");
     const video = document.createElement('img');
     video.id = `video-${playerinfo.socket}`;
     videoContainer.appendChild(username);
     videoContainer.appendChild(video);
+    videoContainer.appendChild(button_tak);
+    videoContainer.appendChild(button_nie);
+    videoContainer.appendChild(button_kick);
+    videoContainer.appendChild(button_ban);
     if(append) streamsContainer.appendChild(videoContainer);
     else streamsContainer.prepend(videoContainer);
     return video;
 }//userId can be in playerinfo.
+addListener("operator_kick",kickplayer);
+addListener("operator_ban",banplayer);
 socket.on('append',()=>{
     append = true;
 });
@@ -367,12 +408,32 @@ function systemHiddenMessage(message){
 socket.on('systemhiddenmessage', (message) => {
     systemHiddenMessage(message);
 });
+function updateClassStyle(className, property, value) {
+    for (let sheet of document.styleSheets) {
+        try {
+            if (!sheet.cssRules) continue;
+            for (let rule of sheet.cssRules) {
+                if (rule.selectorText === `.${className}`) {
+                    rule.style[property] = value; 
+                    return;
+                }
+            }
+            sheet.insertRule(`.${className} { ${property}: ${value}; }`, sheet.cssRules.length);
+            return;
+        } catch (err) {
+            console.warn(`Unable to access stylesheet: ${sheet.href}`, err);
+        }
+    }
+    console.error(`Could not find or modify the class: .${className}`);
+}
 function enableSettings(){
     let operatorOnly = document.getElementsByClassName("operatorOnly");
     console.log(operatorOnly);
     for(var i=0;i<operatorOnly.length;i++){
         operatorOnly[i].disabled = !isOperator;
     }
+    if(isOperator) updateClassStyle("operator_commands", "display", "block");
+    else updateClassStyle("operator_commands", "display", "none");
 }
 function saveSettings(){
     let operatorOnly = document.getElementsByClassName("operatorOnly");

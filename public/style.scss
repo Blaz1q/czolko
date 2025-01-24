@@ -32,10 +32,13 @@ body {
     video,img{
         width: calc(100% - .4em);
         border: .2em solid white;
-        border-radius: .4em;
+        border-radius: .8em;
         height: fit-content;
     }
     gap: .8em;
+}
+.username{
+    color: #EFEDFF;
 }
 video {
     -webkit-transform: scaleX(-1);
@@ -48,6 +51,9 @@ video {
     display: flex;
     flex-direction: column;
     gap: 1em;
+}
+.gameplay_buttons, .operator_commands{
+    display: none;
 }
 #gameplay-container {
     flex: 1;

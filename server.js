@@ -27,7 +27,7 @@ const words = {
         cenzura:["sztuczna cipa","sperma","fiut","duże cyce","małe cyce","cyce miseczka c"]
     }
 }
-const colors = ["#1401C5","#0DAE0D","#F44E06","#9900AD","#FFC300"];
+const colors = ["#1401C5","#0DAE0D","#F44E06","#9900AD","#FFC300","#EC292D","#E524CB","#0DAEA4","#FF5656"];
 app.use(express.static(path.join(__dirname, 'public')));
 // app.get('imgs/', (req, res) => {
 //     res.sendFile(path.join(__dirname, 'public', '/imgs/'));
@@ -82,7 +82,10 @@ function startGame(socket,roomname){
     }
 }
 function endGame(socket,roomname){
-
+    if(roomsettings[roomname].isstarted){
+        socket.to(rooms[roomname]).emit('endGame');
+        setGame(socket,roomname,false);
+    }
 }
 function setGame(socket,roomname,isStarted){
     roomsettings[roomname].isstarted = isStarted;
@@ -158,7 +161,11 @@ function updateOperator(socket,player){
     }
 }
 function deleteRoom(room){
-if(rooms[room].length==0) delete rooms[room];
+if(rooms[room].length==0){
+    delete rooms[room];
+    delete bannedplayers[room];
+    delete roomsettings[room];
+} 
 }
 function getFirstPLayerInRoom(room){
     if(rooms[room]){
@@ -176,12 +183,12 @@ io.on('connection', (socket) => {
         socket.join(room);
         socket.emit('systemmessage', `You joined the room.`);
         socket.to(room).emit('systemmessage', `${players[socket.id].username} joined.`);
-        socket.emit('position', rooms[room].indexOf(socket.id));
         for(var i=rooms[room].length-1;i>=0;i--){
             if(socket.id!=rooms[room][i]) {
                 let player = players[rooms[room][i]];
                 let playerinfo = {
                     socket: rooms[room][i],
+                    color: player.color,
                     username: player.username,
                     isOwner: ifOperator(rooms[room][i],room)
                 }
@@ -202,10 +209,10 @@ io.on('connection', (socket) => {
         socket.emit('append');
     });
     socket.on('kickplayer', (roomname,index)=>{
-        if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]) kickplayer(socket,rooms[roomname][index],"you have been kicked");
+        if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]&&index<rooms[roomname].length) kickplayer(socket,rooms[roomname][index],"you have been kicked");
     });
     socket.on('banplayer', (roomname,index)=>{
-        if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]) banplayer(socket,roomname,rooms[roomname][index],"you have been kicked");
+        if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]&&index<rooms[roomname].length) banplayer(socket,roomname,rooms[roomname][index],"you have been kicked");
     });
     socket.on('startgame', (roomname)=>{
         if(operators[roomname]==socket.id) {
@@ -216,7 +223,8 @@ io.on('connection', (socket) => {
         }
     });
     socket.on('endGame',(roomname)=>{
-        
+        endGame(socket,roomname);
+        setGame(socket,roomname,false);
     });
     socket.on('leaveRoom', (roomName) => {
         socket.leave(roomName);
@@ -248,7 +256,7 @@ io.on('connection', (socket) => {
         const index = rooms[player.room].indexOf(socket.id);
         rooms[player.room].splice(index,1); //delete player from room
         if(rooms[player.room].length<2){
-            socket.broadcast.to(player.room).emit('endGame');
+            endGame(socket,player.room);
         }
         updateOperator(socket,player);
         deleteRoom(player.room); //delete room

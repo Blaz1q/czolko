@@ -36,9 +36,13 @@ body {
 #streamsContainer video, #streamsContainer img {
   width: calc(100% - 0.4em);
   border: 0.2em solid white;
-  border-radius: 0.4em;
+  border-radius: 0.8em;
   height: -moz-fit-content;
   height: fit-content;
+}
+
+.username {
+  color: #EFEDFF;
 }
 
 video {
@@ -52,6 +56,10 @@ video {
   display: flex;
   flex-direction: column;
   gap: 1em;
+}
+
+.gameplay_buttons, .operator_commands {
+  display: none;
 }
 
 #gameplay-container {
