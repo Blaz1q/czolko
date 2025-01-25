@@ -4,19 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Czółko</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="user.css">
     <script src="/socket.io/socket.io.js"></script>
     <script>
     const socket = io();
     </script>
-    <script src="client.js"></script>
+    <script defer src="client.js"></script>
 </head>
 <body>
-    <video autoplay muted></video>
-    <button onclick="CreateRoom()">Create Private Room</button>
-    <input type="text" id="gamerusername" /> 
-    <button onclick="buttonUsername()">change username</button>
-    <input type="number" id="gameravatar" />
-    <button onclick="buttonUsername()">change avatar</button>
-</body>
+    <div class="user">
+        <video autoplay muted></video>
+        <img src="./imgs/camera_disabled.png" alt="nocamera" id="nocamera" style="display: none;">
+        <button onclick="startCamera()" id="cameraoff" style="display: none;">Turn On</button>
+        <input type="text" autocomplete="off" id="gamerusername" onchange="buttonUsername()" onkeyup="buttonUsername()" placeholder="username" /> 
+        <button id="join"  onclick="CreateRoom()">Create Private Room</button>
+    </div>
+    <section id="popup" style="display: none;" >
+       <div>
+            <img id="popup_image">
+            <p id="error_message"></p>
+            <button onclick="closePopup()">close</button>
+       </div>
+    </section>
+    </body>
 </html>

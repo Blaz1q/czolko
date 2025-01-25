@@ -7,7 +7,6 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 const path = require('path');
-const { json } = require('stream/consumers');
 
 const players = {};
 const rooms = [];
@@ -49,7 +48,6 @@ function sanitizeMessage(str) {
     return str.replace(/\s+/g, ' ').trim();
 }
 function checkBannedPlayers(roomname,uuid){
-    var isbanned = false;
     for(var i=0;i<bannedplayers[roomname].length;i++){
         if(bannedplayers[roomname][i]==uuid) return true;
     }
@@ -61,18 +59,12 @@ function shuffleArray(array) {
         [array[i], array[j]] = [array[j], array[i]];
     }
 }
-function startGame(socket,roomname){
-    let shuffleword = words.polski.normalne.slice();
-    shuffleArray(shuffleword);
-    for(var i=0;i<rooms[roomname].length;i++){
-        let player = players[rooms[roomname][i]];
-        player.word = shuffleword[i]; 
-    }
+function emitWordsToPlayers(socket,roomname){
     for (var i = 0; i < rooms[roomname].length; i++) {
         for (var j = 0; j < rooms[roomname].length; j++) {
             if (i !== j) {
-                socket.broadcast.to(rooms[roomname][j]).emit('word', rooms[roomname][i], shuffleword[i]);
-                if(j==0) socket.emit('word', rooms[roomname][i], shuffleword[i]); //nie wiem czemu działa, ale działa.
+                socket.broadcast.to(rooms[roomname][j]).emit('word', rooms[roomname][i], players[rooms[roomname][i]].word);
+                if(j==0) socket.emit('word', rooms[roomname][i], players[rooms[roomname][i]].word); //nie wiem czemu działa, ale działa.
             }
             else{
                 if(j==0) socket.emit('word', rooms[roomname][i], "???");
@@ -80,15 +72,86 @@ function startGame(socket,roomname){
             }
         }
     }
+    socket.broadcast.to(roomname).emit('timeEnd');
+    socket.emit('timeEnd');
+}
+function emitPlayerToPlayer(socket,roomname){
+    socket.emit('randomPlayer',players[players[rooms[roomname][0]].socket].username);
+    for(var i=0;i<rooms[roomname].length;i++){
+        console.log(players[players[rooms[roomname][i]].socket].username);
+        socket.broadcast.to(rooms[roomname][i]).emit('randomPlayer',players[players[rooms[roomname][i]].socket].username);
+    }
+    setTimeout( function() { emitWordsToPlayers(socket,roomname)}, 1000*30); //napraw to później.
+}
+function startRandomGame(socket,roomname){
+    let shuffleword = words.polski.normalne.slice();
+    shuffleArray(shuffleword);
+    for(var i=0;i<rooms[roomname].length;i++){
+        let player = players[rooms[roomname][i]];
+        player.word = shuffleword[i];
+    }
+    console.log(players);
+    emitWordsToPlayers(socket,roomname);
+}
+function losujGraczy(listaGraczy) {
+    while (true) {
+        const wylosowani = [...listaGraczy];
+        wylosowani.sort(() => Math.random() - 0.5);
+        const isValid = listaGraczy.every((gracz, index) => gracz !== wylosowani[index]);
+        if (isValid) {
+            return wylosowani;
+        }
+    }
+}
+function startNormalGame(socket,roomname){
+    let localplayers = rooms[roomname].slice();
+    let shuffleword = words.polski.normalne.slice();
+    const wynik = losujGraczy(localplayers);
+    shuffleArray(shuffleword);
+    for(var i=0;i<localplayers.length;i++){
+        players[localplayers[i]].player = wynik[i];
+        players[localplayers[i]].word = shuffleword[i];
+        console.log(players[localplayers[i]]);
+        console.log(localplayers[i]+" "+wynik[i]);
+    }
+    emitPlayerToPlayer(socket,roomname,wynik);
+}
+function startGame(socket,roomname){
+    switch(roomsettings[roomname].gamemode){
+        case 'NORMAL':{
+            startNormalGame(socket,roomname);
+        }
+        break;
+        case 'RANDOM':{
+            startRandomGame(socket,roomname);
+        }break;
+        default:{
+            startRandomGame(socket,roomname);
+        }break;
+            
+        
+    }
 }
 function endGame(socket,roomname){
     if(roomsettings[roomname].isstarted){
         socket.to(rooms[roomname]).emit('endGame');
-        setGame(socket,roomname,false);
+        setGame(roomname,false);
     }
 }
-function setGame(socket,roomname,isStarted){
+function setGame(roomname,isStarted){
     roomsettings[roomname].isstarted = isStarted;
+}
+function parseGamemode(gamemode){
+    var gamemodes = ["NORMAL","RANDOM"];
+    for(var i=0;i<gamemodes.length;i++){
+        if(gamemode.toUpperCase()==gamemodes[i]) return gamemode;
+    }
+    return "RANDOM";
+}
+function parseMaxPlayers(maxplayer){
+    if(maxplayer>15) return 15;
+    if(maxplayer<2) return 2;
+    return maxplayer;
 }
 function addPlayer(socket, clientUuid, name, outfit, room) {
     players[socket.id] = { 
@@ -100,23 +163,24 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
         room: room,
         word: "",
         lang: "polski",
+        player: ""
     };
     console.log(players[socket.id]);
     if(bannedplayers[room]){
         if(checkBannedPlayers(room,players[socket.id].id)){
-            socket.emit('banned');
+            socket.emit('banned',"you are banned.");
             delete players[socket.id];
             return;
         }
     }
     if(roomsettings[room]&&rooms[room]){
         if(rooms[room].length>=roomsettings[room].maxPlayers){
-            socket.emit('kickplayer',"too many players");
+            socket.emit('servererror',"too many players");
             delete players[socket.id];
             return;
         }
         if(roomsettings[room].isstarted){
-            socket.emit('kickplayer',"game is started");
+            socket.emit('servererror',"game is started");
             delete players[socket.id];
             return;
         }
@@ -126,9 +190,8 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
         roomsettings[room] = {
             isstarted: false,
             maxPlayers: 10,
-            gamemode: "normal",
-            time: 30,
-            customWordSet: false
+            gamemode: "RANDOM",
+            time: 30
         }
     }
     rooms[room].push(socket.id);
@@ -183,6 +246,7 @@ io.on('connection', (socket) => {
         socket.join(room);
         socket.emit('systemmessage', `You joined the room.`);
         socket.to(room).emit('systemmessage', `${players[socket.id].username} joined.`);
+        socket.emit('settings',roomsettings[room]);
         for(var i=rooms[room].length-1;i>=0;i--){
             if(socket.id!=rooms[room][i]) {
                 let player = players[rooms[room][i]];
@@ -212,19 +276,38 @@ io.on('connection', (socket) => {
         if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]&&index<rooms[roomname].length) kickplayer(socket,rooms[roomname][index],"you have been kicked");
     });
     socket.on('banplayer', (roomname,index)=>{
-        if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]&&index<rooms[roomname].length) banplayer(socket,roomname,rooms[roomname][index],"you have been kicked");
+        if(operators[roomname]==socket.id&&operators[roomname]!=rooms[roomname][index]&&index<rooms[roomname].length) banplayer(socket,roomname,rooms[roomname][index],"you have been banned");
     });
     socket.on('startgame', (roomname)=>{
-        if(operators[roomname]==socket.id) {
-            setGame(socket,roomname,true);
+        if(operators[roomname]==socket.id&&!roomsettings[roomname].isstarted) {
+            setGame(roomname,true);
             socket.emit('startgame');
             socket.to(roomname).emit('startgame');
             startGame(socket,roomname);
         }
     });
+    socket.on('settings',(roomname,settings)=>{
+        if(operators[roomname]==socket.id){
+            roomsettings[roomname].gamemode = parseGamemode(settings.gamemode);
+            roomsettings[roomname].maxPlayers = parseMaxPlayers(settings.maxPlayers);
+            console.log(roomsettings[roomname])
+            socket.emit('settings',roomsettings[roomname]);
+            socket.broadcast.to(roomname).emit('settings',roomsettings[roomname]);
+        }
+    })
+    socket.on('slowo',(roomname,slowo)=>{
+        if(roomsettings[roomname].isstarted&&roomsettings[roomname].gamemode=='NORMAL'){
+            if(sanitizeMessage(slowo).length>2){
+                let clean_slowo = sanitizeMessage(slowo);
+                console.log("player: "+players[socket.id].player);
+                players[players[socket.id].player].word = clean_slowo;
+                console.log(players);
+            }
+        }
+    })
     socket.on('endGame',(roomname)=>{
         endGame(socket,roomname);
-        setGame(socket,roomname,false);
+        setGame(roomname,false);
     });
     socket.on('leaveRoom', (roomName) => {
         socket.leave(roomName);

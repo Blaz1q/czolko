@@ -29,19 +29,17 @@
                 </div>
                 <div id="gameplay-settings">
                     <div id="gamemode">
-                        gamemode
-                        <label>
-                            normalnie
-                            <input type="radio" onchange="saveSettings()" class="operatorOnly" name="gameplay" value="normal" id="" />
-                        </label>
-                        <label>
-                            losowo
-                            <input type="radio" onchange="saveSettings()" class="operatorOnly" name="gameplay" value="random" id="" />
-                        </label>
-                        <label>
-                            tematycznie
-                            <input type="radio" onchange="saveSettings()" class="operatorOnly" name="words" id="" />
-                        </label>
+                        <div id="gamemode-selection">
+                            <input type="radio" onchange="saveSettings()" class="operatorOnly" name="gameplay" value="NORMAL" id="gamemode_1" />
+                            <label for="gamemode_1">
+                                <h2>Normalnie</h2>
+                                <p>Wymyśl słowo dla innego gracza</p></label>
+                                <input type="radio" onchange="saveSettings()" class="operatorOnly" name="gameplay" value="RANDOM" id="gamemode_2" checked/>
+                                <label for="gamemode_2">
+                                    <h2>Losowo</h2>
+                                    <p>Dobiera losowo słowa</p></label>
+                        </div>
+                        <button onclick="copylink()">Kopiuj Link</button>
                         <button onclick="startGame() " class="operatorOnly">start game</button>
                     </div>
                     <div id="settings" style="display: none;">
@@ -49,6 +47,9 @@
                         <label>customwordset<textarea onchange="saveSettings()" class="operatorOnly" name="customwordset"></textarea></label>
                     </div>
                 </div>
+            </div>
+            <div id="notatnik" style="display: none;">
+                <textarea></textarea>
             </div>
             <div id="chat-container">
                 <div id="chat">
@@ -61,6 +62,14 @@
             </div>
         </div>
     </div>
-    
+    <section id="popup" style="display: none;" >
+        <div>
+            <p>wymyśl słowo dla:</p>
+             <p id="random_username"></p>
+             
+             <input type="text" id="yourword" />
+             <button onclick="wymyslSlowo(); closePopup();">wyślij</button>
+        </div>
+     </section>
 </body>
 </html>

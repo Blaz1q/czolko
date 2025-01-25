@@ -8,12 +8,17 @@ const requestLimit = 3;
 var canSendMessage=true;
 var penaltyCounter=0;
 const penaltyDuration=30;
+const nocamera = document.getElementById("nocamera");
 const video = document.querySelector('video');
 const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d');
-const nocamera = document.getElementById("nocamera");
+const sidebar = document.getElementById("gameplay-container");
+const notatnik = document.getElementById("notatnik");
+
 var gameplay_container = true;
 var player_counter=1;
+var is_your_turn = false;
+
 // Capture video
 const messages = {
     polski: {
@@ -49,8 +54,7 @@ function getMessages(lang){
     return messages.english;
 }
 let gameSettings = {
-    gamemode: "default",
-    customWordset: "",
+    gamemode: "RANDOM",
     maxPlayers: 8
 }
 function copylink(){
@@ -71,9 +75,16 @@ function banplayer(id){
 function startGame(){
     if(player_counter>1) socket.emit('startgame',roomName);
 }
-socket.on('startgame',()=>{
+socket.on('startgame',(gamemode)=>{
     console.log("game started :)");
-    updateClassStyle("gameplay_buttons", "display", "block");
+    notatnik.style.display="flex";
+    sidebar.style.display="none";
+
+    switch(gameSettings.gamemode){
+        case "NORMAL": 
+        showPopup();
+        break;
+    }
     //hide menu
     //get gamemode
     //gamemode = normal -> losuje gracza, wymyślasz mu pytanie (shuffle), timer 30 sek na wymyślenie słowa
@@ -87,11 +98,15 @@ socket.on('endGame',()=>{
         document.getElementById(`${id}-word`).remove();
     }
     updateClassStyle("gameplay_buttons", "display", "none");
+    notatnik.style.display="none";
+    sidebar.style.display="flex";
 });
 const roomName = getQueryParam('room');
 
 const scaleFactor = 0.4;
-const quality = 0.6; 
+const quality = 0.4; 
+const better_quality = 0.6;
+
 function startCamera() {
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         .then((stream) => {
@@ -99,7 +114,6 @@ function startCamera() {
             videoTrack = stream.getVideoTracks()[0];
             const { width, height } = videoTrack.getSettings();
             video.srcObject = stream;
-            
             canvas.width = width * scaleFactor;
             canvas.height = height * scaleFactor;
             isCameraOn = true;
@@ -107,11 +121,14 @@ function startCamera() {
             setInterval(() => {
                 if (isCameraOn && videoTrack.readyState === 'live' && videoTrack.enabled) {
                     context.drawImage(video, 0, 0, width*scaleFactor, height*scaleFactor);
+                    var q;
+                    if(is_your_turn) q = better_quality; 
+                    else q = quality;
                     canvas.toBlob((blob) => {
                         if (blob) {
                             socket.emit('userstream', { frame: blob, roomName });
                         }
-                    }, 'image/jpeg', quality);
+                    }, 'image/jpeg', q);
                 }
             }, 1000 / fps);
         })
@@ -268,19 +285,13 @@ function createVideoElement(playerinfo) {
     videoContainer.id = `user-${playerinfo.socket}`;
     videoContainer.className = 'video-container';
     const username = document.createElement('p');
-    const button_tak = document.createElement('button');
-    const button_nie = document.createElement('button');
     const button_kick = document.createElement('button');
     const button_ban = document.createElement('button');
     
     username.appendChild(createText(playerinfo.username));
-    button_tak.appendChild(createText("tak"));
-    button_nie.appendChild(createText("nie"));
     button_kick.appendChild(createText("kick"));
     button_ban.appendChild(createText("ban"));
     
-    button_tak.classList.add("gameplay_buttons");
-    button_nie.classList.add("gameplay_buttons");
     button_kick.classList.add("operator_commands");
     button_kick.classList.add("operator_kick");
     button_ban.classList.add("operator_commands");
@@ -291,8 +302,6 @@ function createVideoElement(playerinfo) {
     video.id = `video-${playerinfo.socket}`;
     videoContainer.appendChild(username);
     videoContainer.appendChild(video);
-    videoContainer.appendChild(button_tak);
-    videoContainer.appendChild(button_nie);
     videoContainer.appendChild(button_kick);
     videoContainer.appendChild(button_ban);
     if(append) streamsContainer.appendChild(videoContainer);
@@ -435,10 +444,35 @@ function enableSettings(){
     if(isOperator) updateClassStyle("operator_commands", "display", "block");
     else updateClassStyle("operator_commands", "display", "none");
 }
+socket.on('settings',(serversettings)=>{
+    let operatorOnly = document.getElementsByClassName("operatorOnly");
+    gameSettings.gamemode = serversettings.gamemode;
+    for(var i=0;i<operatorOnly.length;i++){
+        switch(operatorOnly[i].getAttribute('name')){
+            case 'gameplay':
+                operatorOnly[i].checked = false;
+                
+                if(serversettings.gamemode==operatorOnly[i].value) operatorOnly[i].checked = true;
+            break;
+            case 'maxplayers':
+                operatorOnly[i].value = parseInt(serversettings.maxPlayers);
+            break;
+        }
+    }
+});
+socket.on('randomPlayer',(player)=>{
+    document.getElementById("random_username").innerHTML = player;
+})
+function wymyslSlowo(){
+    let slowo = document.getElementById("yourword").value;
+    socket.emit('slowo',roomName,sanitizeMessage(slowo));
+}
+socket.on('timeEnd',()=>{
+    closePopup();
+})
 function saveSettings(){
     let operatorOnly = document.getElementsByClassName("operatorOnly");
     for(var i=0;i<operatorOnly.length;i++){
-        console.log();
         switch(operatorOnly[i].getAttribute('name')){
             case 'gameplay':
                 if(operatorOnly[i].checked){
@@ -463,12 +497,7 @@ function saveSettings(){
         }
     }
     console.log(gameSettings);
-    socket.emit('settings',gameSettings);
-}
-function changeRoomSettings(){
-    //Roomsize
-    //CustomWordset
-    //time
+    socket.emit('settings',roomName,gameSettings);
 }
 var isOperator = false;
 socket.on('operator', ()=>{
@@ -487,10 +516,13 @@ function shouldScroll(isScrolledToBottom,chat){
     });
 }
 socket.on('banned',(message)=>{
-    window.location.href = `/?message=${message}`;
+    window.location.href = `/?message=${message}&image=banned`;
+});
+socket.on('servererror',(message)=>{
+    window.location.href = `/?room=${roomName}&message=${message}&image=error`;
 });
 socket.on('kickplayer',(message) =>{
-    window.location.href = `/?message=${message}`;
+    window.location.href = `/?room=${roomName}&message=${message}&image=kicked`;
 });
 socket.on('usermessage', (player,message) => {
     let chat = document.getElementById("chat");
@@ -498,3 +530,9 @@ socket.on('usermessage', (player,message) => {
     chat.append(formatUserMessage(player,message));
     shouldScroll(isScrolledToBottom,chat);
 });
+function closePopup(){
+    popup.style.display="none";
+}
+function showPopup(){
+    popup.style.display="flex";
+}

@@ -62,6 +62,17 @@ video {
   display: none;
 }
 
+#notatnik {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+#notatnik textarea {
+  height: 100%;
+  resize: none;
+  border-radius: 0.4em;
+}
+
 #gameplay-container {
   flex: 1;
   display: flex;
@@ -108,4 +119,76 @@ video {
 #chat-input {
   display: flex;
   width: 100%;
+}
+
+#gamemode-selection {
+  display: grid;
+  margin: 0.4em;
+  padding: 0.4em;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: center;
+  gap: 0.2em;
+  height: -moz-fit-content;
+  height: fit-content;
+}
+#gamemode-selection input[type=radio] {
+  display: none;
+}
+#gamemode-selection input[type=radio]:not(:disabled) ~ label {
+  cursor: pointer;
+}
+#gamemode-selection input[type=radio]:not(:disabled) ~ label:hover {
+  background: rgb(139, 245, 192);
+  border: 2px solid rgb(139, 245, 192);
+}
+#gamemode-selection input[type=radio]:disabled ~ label {
+  cursor: not-allowed;
+}
+#gamemode-selection input[type=radio]:disabled ~ label {
+  cursor: not-allowed;
+}
+#gamemode-selection label {
+  height: 100%;
+  display: block;
+  background: white;
+  border: 2px solid hsl(150, 75%, 50%);
+  border-radius: 20px;
+  padding: 0.5em;
+  text-align: center;
+  box-shadow: 0px 3px 10px -2px hsla(150, 5%, 65%, 0.5);
+  position: relative;
+  transition: 0.2s;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+#gamemode-selection input[type=radio]:checked + label {
+  background: hsl(150, 75%, 50%);
+  color: hsl(215, 0%, 100%);
+}
+
+#popup {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(33, 33, 33, 0.59);
+}
+#popup div {
+  display: flex;
+  flex-direction: column;
+  width: 20%;
+  height: -moz-fit-content;
+  height: fit-content;
+  margin: auto;
+  background-color: white;
+  border-radius: 0.8em;
+  padding: 2em;
+  padding-left: 3em;
+  padding-right: 3em;
+  gap: 0.4em;
 }/*# sourceMappingURL=style.css.map */
