@@ -8,6 +8,8 @@ const { Server } = require('socket.io');
 const io = new Server(server);
 const path = require('path');
 
+// todo: wysyłaj tylko potrzebne informacje dla graczy: nie wysyłaj roomname;
+
 const players = {};
 const rooms = [];
 const operators = [];
@@ -89,9 +91,34 @@ function startRandomGame(socket,roomname){
     for(var i=0;i<rooms[roomname].length;i++){
         let player = players[rooms[roomname][i]];
         player.word = shuffleword[i];
+        player.czy_zgadl = false;
     }
     console.log(players);
     emitWordsToPlayers(socket,roomname);
+}
+function incrementTura(roomname){
+    if(roomsettings[roomname]){
+        let counter=0;
+        let player;
+        do{
+            player = players[rooms[roomname][roomsettings[roomname].current_player]];
+            roomsettings[roomname].current_player=++roomsettings[roomname].current_player%rooms[roomname].length;
+            counter++;
+        }while(player.czy_zgadl&&counter<rooms[roomname].length);
+    }
+}
+function sendTura(socket,roomname){
+    const player = players[rooms[roomname][roomsettings[roomname].current_player]];
+    socket.emit('turn',player);
+    socket.broadcast.to(roomname).emit("turn",player);
+    socket.to(rooms[roomname][roomsettings[roomname].current_player]).emit("yourturn");
+    if(socket.id==rooms[roomname][roomsettings[roomname].current_player]) socket.emit("yourturn");
+}
+function updateTura(roomname){
+    if(roomsettings[roomname]){
+    roomsettings[roomname].current_player%=rooms[roomname].length;
+    console.log(roomsettings[roomname].current_player);
+    }
 }
 function losujGraczy(listaGraczy) {
     while (true) {
@@ -111,6 +138,7 @@ function startNormalGame(socket,roomname){
     for(var i=0;i<localplayers.length;i++){
         players[localplayers[i]].player = wynik[i];
         players[localplayers[i]].word = shuffleword[i];
+        players[localplayers[i]].czy_zgadl = false;
         console.log(players[localplayers[i]]);
         console.log(localplayers[i]+" "+wynik[i]);
     }
@@ -128,8 +156,6 @@ function startGame(socket,roomname){
         default:{
             startRandomGame(socket,roomname);
         }break;
-            
-        
     }
 }
 function endGame(socket,roomname){
@@ -163,7 +189,8 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
         room: room,
         word: "",
         lang: "polski",
-        player: ""
+        player: "",
+        czy_zgadl: false
     };
     console.log(players[socket.id]);
     if(bannedplayers[room]){
@@ -191,9 +218,13 @@ function addPlayer(socket, clientUuid, name, outfit, room) {
             isstarted: false,
             maxPlayers: 10,
             gamemode: "RANDOM",
-            time: 30
+            time: 30,
+            current_player: 0
         }
+        console.log(roomsettings[room]);
+        console.log(room);
     }
+
     rooms[room].push(socket.id);
     if(!operators[room]){
         operators[room] = socket.id;
@@ -304,6 +335,10 @@ io.on('connection', (socket) => {
                 console.log(players);
             }
         }
+    });
+    socket.on('nextturn',(roomname)=>{
+        incrementTura(roomname);
+        sendTura(socket,roomname);
     })
     socket.on('endGame',(roomname)=>{
         endGame(socket,roomname);
@@ -313,14 +348,17 @@ io.on('connection', (socket) => {
         socket.leave(roomName);
     });
 
-    socket.on('roomMessage', ({ roomName, message }) => {
-        if(players[socket.id]){
+    socket.on('roomMessage', (message,roomname) => {
+        if(players[socket.id]&&roomname==players[socket.id].room){
             const player = {
                 username: players[socket.id].username,
                 color: players[socket.id].color
             }
-            socket.to(roomName).emit('usermessage', player,`${sanitizeMessage(message)}`);
+            socket.to(roomname).emit('usermessage', player,`${sanitizeMessage(message)}`);
             let operator = "";
+            incrementTura(roomname);
+            console.log(roomname);
+            console.log(roomsettings[roomname].current_player);
             //if(ifOperator(roomName,socket.id)) operator = "(/\\/\\)";
 
             socket.emit('usermessage', player,`${sanitizeMessage(message)}`);
@@ -341,6 +379,7 @@ io.on('connection', (socket) => {
         if(rooms[player.room].length<2){
             endGame(socket,player.room);
         }
+        updateTura(player.room);
         updateOperator(socket,player);
         deleteRoom(player.room); //delete room
         socket.broadcast.emit('position', index);

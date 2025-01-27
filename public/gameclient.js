@@ -1,3 +1,4 @@
+// Błażej Czarnecki, 2025r.
 var fps = 12;
 var append = false;
 let videoStream = null; // To store the current stream
@@ -8,12 +9,13 @@ const requestLimit = 3;
 var canSendMessage=true;
 var penaltyCounter=0;
 const penaltyDuration=30;
+
 const nocamera = document.getElementById("nocamera");
 const video = document.querySelector('video');
 const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d');
 const sidebar = document.getElementById("gameplay-container");
-const notatnik = document.getElementById("notatnik");
+const game_container = document.getElementById("game-container");
 
 var gameplay_container = true;
 var player_counter=1;
@@ -77,7 +79,7 @@ function startGame(){
 }
 socket.on('startgame',(gamemode)=>{
     console.log("game started :)");
-    notatnik.style.display="flex";
+    game_container.style.display="flex";
     sidebar.style.display="none";
 
     switch(gameSettings.gamemode){
@@ -98,7 +100,7 @@ socket.on('endGame',()=>{
         document.getElementById(`${id}-word`).remove();
     }
     updateClassStyle("gameplay_buttons", "display", "none");
-    notatnik.style.display="none";
+    game_container.style.display="none";
     sidebar.style.display="flex";
 });
 const roomName = getQueryParam('room');
@@ -212,11 +214,15 @@ socket.on("connect", () => {
 });
 
 // Send message to a room
+var zgaduje = false;
 document.getElementById("userMessage").addEventListener("keypress", function(event) {
     // If the user presses the "Enter" key on the keyboard
     if (event.key === "Enter") {
       event.preventDefault();
       sendMessage();
+      if(zgaduje){
+        zgaduj();
+      }
     }
 });
 function applyPenalty() {
@@ -245,7 +251,7 @@ function sendMessage() {
     if(canSendMessage){
         let message = sanitizeMessage(document.getElementById("userMessage").value);
         if(message.length>0&&message!=' '){
-            socket.emit('roomMessage', { message, roomName });
+            socket.emit('roomMessage', message, roomName );
             requestCounter++;
             if(requestCounter>requestLimit) applyPenalty();
         }
@@ -535,4 +541,13 @@ function closePopup(){
 }
 function showPopup(){
     popup.style.display="flex";
+}
+socket.on("turn",(player)=>{
+    console.log(player);
+});
+socket.on("yourturn",()=>{
+    console.log("yourturn");
+});
+function nextturn(){
+    socket.emit('nextturn',roomName);
 }

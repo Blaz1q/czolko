@@ -56,7 +56,7 @@ video {
 .gameplay_buttons, .operator_commands{
     display: none;
 }
-#notatnik {
+#game-container {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -96,6 +96,7 @@ video {
     padding: .3em;
     background-color: white;
     border-radius: 1em;
+    margin-left: .5em;
 }
 
 #chat {
@@ -122,8 +123,8 @@ video {
         &:not(:disabled) ~ label {
           cursor: pointer;
           &:hover{
-            background: rgb(139, 245, 192);
-            border: 2px solid rgb(139, 245, 192);
+            background: rgb(226, 140, 255);
+            border: 2px solid rgb(226, 140, 255);
           }
         }
         &:disabled ~ label {
@@ -138,7 +139,7 @@ video {
         height: 100%;
         display: block;
         background: white;
-        border: 2px solid hsla(150, 75%, 50%, 1);
+        border: 2px solid rgb(175, 32, 223);
         border-radius: 20px;
         padding: .5em;
         text-align: center;
@@ -148,7 +149,7 @@ video {
         user-select: none;
       }
       input[type="radio"]:checked + label {
-        background: hsla(150, 75%, 50%, 1);
+        background: rgb(175, 32, 223);
         color: hsla(215, 0%, 100%, 1);
       }
 }
